@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "UiGo Demo",
+    "slug": "uigo-demo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "uigo",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.uigo.demo"
+    },
+    "android": {
+      "package": "com.uigo.demo",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F6F2"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "UiGo использует геолокацию, чтобы показать свободные объекты рядом."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "UiGo позволяет владельцам выбирать фото объектов из галереи."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
