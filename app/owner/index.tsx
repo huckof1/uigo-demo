@@ -1,109 +1,284 @@
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { AppHeader } from "@/components/AppHeader";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { PremiumButton } from "@/components/ui/PremiumButton";
 import {
+  bookingStatusColors,
+  bookingStatusLabels,
+  mockBookingRequests,
+} from "@/features/bookings/mockRequests";
+import {
+  availabilityColors,
   formatTenge,
   getAvailabilityText,
   getPropertyById,
+  mockProperties,
   propertyTypeLabels,
 } from "@/lib/mock/properties";
+import type { MockProperty, PropertyAvailabilityStatus } from "@/lib/types/property";
+
+const demoOwnerProperties = mockProperties.slice(0, 4);
+
+type AvailabilityAction = {
+  label: string;
+  status: PropertyAvailabilityStatus;
+};
+
+const availabilityActions: AvailabilityAction[] = [
+  { label: "Свободно сейчас", status: "available_now" },
+  { label: "Скоро", status: "available_soon" },
+  { label: "Занято", status: "occupied" },
+];
 
 export default function OwnerScreen() {
   const { propertyId, request } = useLocalSearchParams<{
     propertyId?: string;
     request?: string;
   }>();
-  const property = getPropertyById(propertyId);
+  const bookingProperty = getPropertyById(propertyId);
   const hasBookingRequest = request === "booking" && Boolean(propertyId);
+  const [acceptedRequestIds, setAcceptedRequestIds] = useState<string[]>([]);
+  const [availabilityById, setAvailabilityById] = useState<
+    Partial<Record<string, PropertyAvailabilityStatus>>
+  >({});
+
+  const ownerProperties = useMemo(() => {
+    if (!hasBookingRequest) {
+      return demoOwnerProperties;
+    }
+
+    const exists = demoOwnerProperties.some((property) => property.id === bookingProperty.id);
+    return exists ? demoOwnerProperties : [bookingProperty, ...demoOwnerProperties.slice(0, 3)];
+  }, [bookingProperty, hasBookingRequest]);
+
+  const incomingRequests = useMemo(() => {
+    const baseRequests = mockBookingRequests.slice(0, 3);
+
+    if (!hasBookingRequest) {
+      return baseRequests;
+    }
+
+    return [
+      {
+        id: `booking-${bookingProperty.id}`,
+        createdLabel: "только что",
+        guestName: "Арендатор рядом",
+        message: "Нажал «Бронь» и ждет быстрый ответ владельца.",
+        propertyId: bookingProperty.id,
+        status: "urgent_pending" as const,
+      },
+      ...baseRequests.filter((item) => item.propertyId !== bookingProperty.id),
+    ];
+  }, [bookingProperty.id, hasBookingRequest]);
+
+  function getVisualStatus(property: MockProperty) {
+    return availabilityById[property.id] ?? property.availabilityStatus;
+  }
 
   return (
     <View style={styles.screen}>
-      <View pointerEvents="none" style={styles.backgroundLayer}>
-        <View style={styles.goldBlob} />
-        <View style={styles.greenBlob} />
-      </View>
-
       <AppHeader title="Владелец" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <Text style={styles.kicker}>Демо владельца</Text>
+        <Animated.View entering={FadeInUp.duration(520).springify()} style={styles.hero}>
+          <Text style={styles.eyebrow}>Demo owner mode</Text>
           <Text style={styles.title}>
-            {hasBookingRequest ? "Новая бронь" : "Входящие заявки"}
+            {hasBookingRequest ? "Новая бронь" : "Кабинет владельца"}
           </Text>
           <Text style={styles.subtitle}>
-            Это легкая панель владельца, не админка. Push-уведомления пока
-            показаны как мок-состояние.
+            Легкая панель для управления готовностью объектов и ответов на заявки.
+            Это не админка, а демо-сценарий владельца.
           </Text>
-        </View>
+        </Animated.View>
 
         {hasBookingRequest ? (
-          <GlassPanel glow variant="floating">
-            <View style={styles.requestCard}>
-              <View style={styles.pushRow}>
+          <Animated.View entering={FadeInDown.delay(80).duration(560).springify()}>
+            <GlassPanel glow variant="floating">
+              <View style={styles.pushCard}>
                 <View style={styles.pushIcon}>
-                  <Feather color="#FFFFFF" name="bell" size={18} />
+                  <Feather color="#FFFFFF" name="bell" size={20} />
                 </View>
-                <View style={styles.pushTextWrap}>
+                <View style={styles.pushCopy}>
                   <Text style={styles.pushTitle}>Push-уведомление отправлено</Text>
-                  <Text style={styles.pushSubtitle}>
-                    В MVP это демо-состояние без production push.
+                  <Text style={styles.pushText}>
+                    В MVP это мок-состояние: production push пока не подключается.
                   </Text>
                 </View>
               </View>
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
 
-              <View style={styles.divider} />
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryValue}>{ownerProperties.length}</Text>
+            <Text style={styles.summaryLabel}>объекта</Text>
+          </View>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryValue}>~7 мин</Text>
+            <Text style={styles.summaryLabel}>ответ</Text>
+          </View>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryValue}>92%</Text>
+            <Text style={styles.summaryLabel}>ответов</Text>
+          </View>
+        </View>
 
-              <View style={styles.requestHeader}>
-                <View>
-                  <Text style={styles.requestLabel}>Заявка от арендатора</Text>
-                  <Text style={styles.tenantName}>Арендатор рядом</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Входящие заявки</Text>
+          <Text style={styles.sectionMeta}>demo</Text>
+        </View>
+
+        {incomingRequests.map((incoming, index) => {
+          const property = getPropertyById(incoming.propertyId);
+          const isAccepted = acceptedRequestIds.includes(incoming.id);
+          const statusLabel = isAccepted
+            ? "Принято"
+            : bookingStatusLabels[incoming.status] ?? "Ожидает";
+          const statusColor = isAccepted
+            ? "#11A665"
+            : bookingStatusColors[incoming.status] ?? "#FFC22E";
+
+          return (
+            <Animated.View
+              entering={FadeInDown.delay(120 + index * 70).duration(520).springify()}
+              key={incoming.id}
+            >
+              <GlassPanel glow={index === 0} variant="strong">
+                <View style={styles.requestCard}>
+                  <Image
+                    resizeMode="cover"
+                    source={{ uri: property.photos[0].url }}
+                    style={styles.requestImage}
+                  />
+                  <View style={styles.requestCopy}>
+                    <View style={styles.statusRow}>
+                      <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                      <Text style={styles.statusText}>{statusLabel}</Text>
+                      <Text style={styles.createdText}>{incoming.createdLabel}</Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.requestTitle}>
+                      {propertyTypeLabels[property.type]} · {property.district}
+                    </Text>
+                    <Text numberOfLines={2} style={styles.requestMessage}>
+                      {incoming.message}
+                    </Text>
+                    <Text style={styles.requestPrice}>
+                      {formatTenge(property.hourlyPrice)} ₸ / час ·{" "}
+                      {formatTenge(property.dailyPrice)} ₸ / сутки
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.urgentBadge}>
-                  <Feather color="#4F7867" name="zap" size={13} />
-                  <Text style={styles.urgentText}>Бронь</Text>
-                </View>
-              </View>
 
-              <View style={styles.propertyBox}>
-                <Text style={styles.propertyType}>{propertyTypeLabels[property.type]}</Text>
-                <Text style={styles.propertyTitle}>{property.title}</Text>
-                <Text style={styles.propertyMeta}>
-                  {property.city}, {property.district} · {getAvailabilityText(property)}
-                </Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceText}>
-                    {formatTenge(property.hourlyPrice)} ₸ / час
-                  </Text>
-                  <Text style={styles.priceMuted}>
-                    {formatTenge(property.dailyPrice)} ₸ / сутки
-                  </Text>
+                <View style={styles.actions}>
+                  <PremiumButton
+                    disabled={isAccepted}
+                    iconName="check"
+                    label={isAccepted ? "Принято" : "Принять"}
+                    onPress={() => {
+                      void Haptics.notificationAsync(
+                        Haptics.NotificationFeedbackType.Success,
+                      );
+                      setAcceptedRequestIds((current) => [...current, incoming.id]);
+                    }}
+                    style={styles.actionButton}
+                  />
+                  <PremiumButton
+                    iconName="message-circle"
+                    label="Написать"
+                    onPress={() => router.push(`/chat/${incoming.id}` as never)}
+                    style={styles.actionButton}
+                    variant="glass"
+                  />
                 </View>
-              </View>
+              </GlassPanel>
+            </Animated.View>
+          );
+        })}
 
-              <View style={styles.ownerActions}>
-                <PremiumButton iconName="check" label="Принять бронь" />
-                <PremiumButton iconName="message-circle" label="Написать" variant="glass" />
-              </View>
-            </View>
-          </GlassPanel>
-        ) : (
-          <GlassPanel glow variant="strong">
-            <View style={styles.emptyCard}>
-              <View style={styles.emptyIcon}>
-                <Feather color="#FFFFFF" name="inbox" size={22} />
-              </View>
-              <Text style={styles.emptyTitle}>Пока нет новых броней</Text>
-              <Text style={styles.emptyDescription}>
-                Когда арендатор нажмет “Бронь”, здесь появится входящая заявка
-                по выбранному объекту.
-              </Text>
-            </View>
-          </GlassPanel>
-        )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Мои объекты</Text>
+          <Text style={styles.sectionMeta}>готовность</Text>
+        </View>
+
+        {ownerProperties.map((property, index) => {
+          const visualStatus = getVisualStatus(property);
+          const colors = availabilityColors[visualStatus];
+
+          return (
+            <Animated.View
+              entering={FadeInDown.delay(180 + index * 60).duration(520).springify()}
+              key={property.id}
+            >
+              <GlassPanel variant="strong">
+                <View style={styles.propertyCard}>
+                  <Image
+                    resizeMode="cover"
+                    source={{ uri: property.photos[0].url }}
+                    style={styles.propertyImage}
+                  />
+                  <View style={styles.propertyCopy}>
+                    <Text style={styles.propertyType}>{propertyTypeLabels[property.type]}</Text>
+                    <Text numberOfLines={1} style={styles.propertyTitle}>
+                      {property.district}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.propertyAddress}>
+                      {property.city}, {property.address}
+                    </Text>
+                    <View style={[styles.availabilityBadge, { borderColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.availabilityDot,
+                          { backgroundColor: colors.background },
+                        ]}
+                      />
+                      <Text style={styles.availabilityText}>
+                        {visualStatus === property.availabilityStatus
+                          ? getAvailabilityText(property)
+                          : availabilityActions.find((item) => item.status === visualStatus)
+                              ?.label}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.availabilityActions}>
+                  {availabilityActions.map((action) => (
+                    <Pressable
+                      key={`${property.id}-${action.status}`}
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        setAvailabilityById((current) => ({
+                          ...current,
+                          [property.id]: action.status,
+                        }));
+                      }}
+                      style={({ pressed }) => [
+                        styles.availabilityAction,
+                        visualStatus === action.status && styles.availabilityActionActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.availabilityActionText,
+                          visualStatus === action.status && styles.availabilityActionTextActive,
+                        ]}
+                      >
+                        {action.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </GlassPanel>
+            </Animated.View>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -112,29 +287,7 @@ export default function OwnerScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#EAE4D9",
-  },
-  backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: "hidden",
-  },
-  goldBlob: {
-    position: "absolute",
-    top: 86,
-    right: -110,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(226, 176, 92, 0.3)",
-  },
-  greenBlob: {
-    position: "absolute",
-    left: -120,
-    bottom: 80,
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: "rgba(83, 145, 130, 0.24)",
+    backgroundColor: "#11100E",
   },
   content: {
     gap: 16,
@@ -142,180 +295,260 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   hero: {
-    gap: 7,
+    gap: 8,
   },
-  kicker: {
-    color: "#806F5A",
+  eyebrow: {
+    color: "rgba(255,247,235,0.58)",
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
-    color: "#171512",
-    fontSize: 34,
+    color: "#FFFFFF",
+    fontSize: 32,
     fontWeight: "900",
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 36,
   },
   subtitle: {
-    color: "#625A50",
+    color: "rgba(255,247,235,0.7)",
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 22,
   },
-  requestCard: {
-    gap: 16,
-    padding: 16,
-  },
-  pushRow: {
+  pushCard: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
+    padding: 16,
   },
   pushIcon: {
     alignItems: "center",
-    backgroundColor: "#171512",
-    borderRadius: 22,
-    height: 44,
+    backgroundColor: "#11A665",
+    borderRadius: 24,
+    height: 48,
     justifyContent: "center",
-    width: 44,
+    width: 48,
   },
-  pushTextWrap: {
+  pushCopy: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
   pushTitle: {
-    color: "#171512",
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 18,
     fontWeight: "900",
     letterSpacing: 0,
   },
-  pushSubtitle: {
-    color: "#625A50",
+  pushText: {
+    color: "rgba(255,247,235,0.66)",
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 18,
   },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.42)",
-  },
-  requestHeader: {
-    alignItems: "center",
+  summaryRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
+    gap: 8,
   },
-  requestLabel: {
-    color: "#806F5A",
-    fontSize: 11,
+  summaryBox: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14,
+  },
+  summaryValue: {
+    color: "#FFFFFF",
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: 0,
-    textTransform: "uppercase",
   },
-  tenantName: {
-    color: "#171512",
-    fontSize: 20,
-    fontWeight: "900",
+  summaryLabel: {
+    color: "rgba(255,247,235,0.62)",
+    fontSize: 12,
+    fontWeight: "800",
     letterSpacing: 0,
     marginTop: 3,
   },
-  urgentBadge: {
+  sectionHeader: {
     alignItems: "center",
-    backgroundColor: "rgba(79, 120, 103, 0.14)",
-    borderColor: "rgba(79, 120, 103, 0.22)",
-    borderRadius: 999,
-    borderWidth: 1,
     flexDirection: "row",
-    gap: 6,
-    minHeight: 34,
-    paddingHorizontal: 11,
+    justifyContent: "space-between",
+    marginTop: 4,
   },
-  urgentText: {
-    color: "#4F7867",
+  sectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  sectionMeta: {
+    color: "rgba(255,247,235,0.52)",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0,
+  },
+  requestCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+  },
+  requestImage: {
+    width: 90,
+    height: 118,
+    borderRadius: 24,
+    backgroundColor: "#BFAF9A",
+  },
+  requestCopy: {
+    flex: 1,
+  },
+  statusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  statusText: {
+    color: "#FFFFFF",
+    flex: 1,
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 0,
   },
-  propertyBox: {
-    backgroundColor: "rgba(255,255,255,0.34)",
-    borderColor: "rgba(255,255,255,0.52)",
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 7,
-    padding: 14,
+  createdText: {
+    color: "rgba(255,247,235,0.5)",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0,
+  },
+  requestTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: 0,
+    marginTop: 8,
+  },
+  requestMessage: {
+    color: "rgba(255,247,235,0.68)",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  requestPrice: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0,
+    marginTop: 8,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+    paddingTop: 0,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 48,
+  },
+  propertyCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+  },
+  propertyImage: {
+    width: 86,
+    height: 102,
+    borderRadius: 23,
+    backgroundColor: "#BFAF9A",
+  },
+  propertyCopy: {
+    flex: 1,
   },
   propertyType: {
-    color: "#806F5A",
+    color: "rgba(255,247,235,0.56)",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   propertyTitle: {
-    color: "#171512",
-    fontSize: 21,
+    color: "#FFFFFF",
+    fontSize: 18,
     fontWeight: "900",
     letterSpacing: 0,
-    lineHeight: 25,
+    marginTop: 5,
   },
-  propertyMeta: {
-    color: "#625A50",
-    fontSize: 14,
+  propertyAddress: {
+    color: "rgba(255,247,235,0.62)",
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0,
-    lineHeight: 20,
+    marginTop: 4,
   },
-  priceRow: {
+  availabilityBadge: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 10,
+    minHeight: 30,
+    paddingHorizontal: 10,
+  },
+  availabilityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  availabilityText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  availabilityActions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 9,
-    marginTop: 3,
+    gap: 8,
+    padding: 12,
+    paddingTop: 0,
   },
-  priceText: {
-    color: "#171512",
-    fontSize: 15,
+  availabilityAction: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  availabilityActionActive: {
+    backgroundColor: "rgba(255,255,255,0.88)",
+    borderColor: "rgba(255,255,255,0.92)",
+  },
+  availabilityActionText: {
+    color: "rgba(255,247,235,0.78)",
+    fontSize: 12,
     fontWeight: "900",
     letterSpacing: 0,
   },
-  priceMuted: {
-    color: "#625A50",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 0,
-  },
-  ownerActions: {
-    gap: 10,
-  },
-  emptyCard: {
-    alignItems: "center",
-    gap: 12,
-    padding: 18,
-  },
-  emptyIcon: {
-    alignItems: "center",
-    backgroundColor: "#171512",
-    borderRadius: 24,
-    height: 48,
-    justifyContent: "center",
-    width: 48,
-  },
-  emptyTitle: {
+  availabilityActionTextActive: {
     color: "#171512",
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 0,
-    textAlign: "center",
   },
-  emptyDescription: {
-    color: "#625A50",
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: 0,
-    lineHeight: 22,
-    textAlign: "center",
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.97 }],
   },
 });

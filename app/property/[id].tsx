@@ -16,6 +16,7 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { PremiumButton } from "@/components/ui/PremiumButton";
+import { useDemoSession } from "@/features/auth/DemoSessionProvider";
 import {
   availabilityColors,
   formatTenge,
@@ -226,6 +227,12 @@ function FullscreenPhotoViewer({
 
 export default function PropertyDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const {
+    addBookingRequest,
+    isAuthenticated,
+    startAuthIntent,
+    tenantProfileComplete,
+  } = useDemoSession();
   const { width } = useWindowDimensions();
   const property = getPropertyById(id);
   const colors = availabilityColors[property.availabilityStatus];
@@ -393,11 +400,36 @@ export default function PropertyDetailsScreen() {
               iconName="calendar"
               label="Бронь"
               onPress={() => {
-                router.push({
-                  pathname: "/owner",
-                  params: {
+                if (!isAuthenticated) {
+                  startAuthIntent({
+                    intent: "booking",
                     propertyId: property.id,
-                    request: "booking",
+                  });
+                  router.push({
+                    pathname: "/auth",
+                    params: {
+                      intent: "booking",
+                      propertyId: property.id,
+                    },
+                  } as never);
+                  return;
+                }
+
+                if (!tenantProfileComplete) {
+                  startAuthIntent({
+                    intent: "booking",
+                    propertyId: property.id,
+                  });
+                  router.push("/profile/setup" as never);
+                  return;
+                }
+
+                addBookingRequest(property.id);
+                router.push({
+                  pathname: "/requests",
+                  params: {
+                    created: "1",
+                    propertyId: property.id,
                   },
                 } as never);
               }}

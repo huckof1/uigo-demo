@@ -13,7 +13,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { HeroPropertyCarousel } from "@/components/property/HeroPropertyCarousel";
-import { PremiumButton } from "@/components/ui/PremiumButton";
 import {
   availabilityColors,
   formatTenge,
@@ -26,13 +25,12 @@ import type { MockProperty } from "@/lib/types/property";
 type PropertyDockProps = {
   bottomSafe: number;
   onOpen: () => void;
-  onRadar: () => void;
   property: MockProperty;
 };
 
 const MORPH_CARD_HEIGHT = 270;
 
-function PropertyDock({ bottomSafe, onOpen, onRadar, property }: PropertyDockProps) {
+function PropertyDock({ bottomSafe, onOpen, property }: PropertyDockProps) {
   const reveal = useSharedValue(1);
   const colors = availabilityColors[property.availabilityStatus];
 
@@ -159,13 +157,6 @@ function PropertyDock({ bottomSafe, onOpen, onRadar, property }: PropertyDockPro
         </Animated.View>
       </Pressable>
 
-      <PremiumButton
-        iconName="radio"
-        label="Радар"
-        onPress={onRadar}
-        style={styles.radarButton}
-        variant="glass"
-      />
     </View>
   );
 }
@@ -209,17 +200,35 @@ export default function HomeScreen() {
             },
           ]}
         >
-          <Text style={styles.logo}>UiGo</Text>
-          <Text style={styles.slogan}>Свободные апартаменты рядом</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.logo}>UiGo</Text>
+              <Text style={styles.slogan}>Свободные апартаменты рядом</Text>
+            </View>
+
+            <Pressable
+              accessibilityLabel="Открыть радар"
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push("/map" as never);
+              }}
+              style={({ pressed }) => [
+                styles.topRadarButton,
+                pressed && styles.topRadarButtonPressed,
+              ]}
+            >
+              <BlurView intensity={74} tint="dark" style={StyleSheet.absoluteFill} />
+              <View pointerEvents="none" style={styles.topRadarTint} />
+              <Feather color="#FFFFFF" name="radio" size={18} />
+              <Text style={styles.topRadarText}>Радар</Text>
+            </Pressable>
+          </View>
         </View>
 
         <PropertyDock
           bottomSafe={bottomSafe}
           onOpen={() => {
             openProperty(selectedProperty);
-          }}
-          onRadar={() => {
-            router.push("/map" as never);
           }}
           property={selectedProperty}
         />
@@ -240,6 +249,15 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
   },
+  headerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  headerCopy: {
+    flex: 1,
+  },
   logo: {
     color: "#FFFFFF",
     fontSize: 30,
@@ -252,6 +270,38 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0,
     marginTop: 4,
+  },
+  topRadarButton: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.28)",
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 46,
+    overflow: "hidden",
+    paddingHorizontal: 14,
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 14,
+    },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+  },
+  topRadarTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(12, 10, 8, 0.56)",
+  },
+  topRadarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  topRadarButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.96 }],
   },
   dock: {
     paddingHorizontal: 16,
@@ -439,8 +489,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0,
-  },
-  radarButton: {
-    marginTop: 8,
   },
 });

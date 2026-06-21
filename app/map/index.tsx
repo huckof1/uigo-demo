@@ -1597,9 +1597,7 @@ export default function RadarScreen() {
                 <Feather color="#171512" name={query.length > 0 ? "x" : "chevron-up"} size={18} />
               </Pressable>
             ) : (
-              <View style={styles.radarActionButton}>
-                <Feather color="#171512" name="chevron-down" size={18} />
-              </View>
+              <Feather color="rgba(23,21,18,0.52)" name="search" size={18} />
             )}
           </Pressable>
 
@@ -1749,31 +1747,6 @@ export default function RadarScreen() {
       >
         <Feather color="#171512" name="chevron-left" size={24} />
       </Pressable>
-
-      {!showRadarPanel ? (
-        <View style={styles.zoomControls}>
-          <Pressable
-            accessibilityLabel="Увеличить масштаб"
-            onPress={() => {
-              void Haptics.selectionAsync();
-              inject("window.uigoZoomIn && window.uigoZoomIn()");
-            }}
-            style={styles.zoomButton}
-          >
-            <Feather color="#171512" name="plus" size={20} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Уменьшить масштаб"
-            onPress={() => {
-              void Haptics.selectionAsync();
-              inject("window.uigoZoomOut && window.uigoZoomOut()");
-            }}
-            style={styles.zoomButton}
-          >
-            <Feather color="#171512" name="minus" size={20} />
-          </Pressable>
-        </View>
-      ) : null}
 
       {zoom < DISTRICT_CLUSTER_ZOOM && !showRadarPanel ? (
         <View style={[styles.hintWrap, { bottom: Math.max(insets.bottom, 14) + 8 }]}>
@@ -1974,31 +1947,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
     borderColor: "rgba(255,255,255,0.24)",
     borderWidth: 1,
-  },
-  zoomControls: {
-    position: "absolute",
-    right: 16,
-    top: 128,
-    gap: 10,
-    elevation: 28,
-    zIndex: 28,
-  },
-  zoomButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "rgba(255,255,255,0.78)",
-    borderColor: "rgba(255,255,255,0.9)",
-    borderWidth: 1,
-    shadowColor: "#2B2118",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
   },
   backButton: {
     position: "absolute",
